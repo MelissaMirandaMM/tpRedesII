@@ -1,6 +1,6 @@
-import socket
 import os
 import pickle
+import socket
 
 # Still ...
 # Implementar a criação e verificação da senha.
@@ -9,6 +9,17 @@ import pickle
 SERVIDOR_PORTA = 12345
 TAMANHO_PACOTE = 1024
 DIRETORIO_ARQUIVOS = "arquivos_servidor"
+SENHA = "123456"
+ESTA_AUTENTICADO = False
+
+def autentica(conexao, senha):
+    conexao.send(senha.encode())
+    response = conexao.recv(TAMANHO_PACOTE).decode()
+    if response == 'OK':
+        return True
+    else:
+        return False
+
 
 # Função para enviar um pacote
 def enviar_pacote(conexao, dados):

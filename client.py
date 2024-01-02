@@ -1,5 +1,5 @@
-import socket
 import pickle
+import socket
 
 # Still ...
 # Adicionar uma etapa para solicitar ou baixar um arquivo específico após receber a lista.
@@ -7,6 +7,16 @@ import pickle
 SERVIDOR_ENDERECO = '127.0.0.1'
 SERVIDOR_PORTA = 12345
 TAMANHO_PACOTE = 1024
+SENHA = "123456"
+
+
+def autenticar(conexao, senha):
+    response = conexao.recv(TAMANHO_PACOTE).decode()
+    if response == senha:
+        conexao.send('OK'.encode())
+        return True
+    else:
+        return False
 
 
 def receber_pacote(conexao):
@@ -26,14 +36,14 @@ def solicitar_lista_arquivos(conexao):
 def cliente():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((SERVIDOR_ENDERECO, SERVIDOR_PORTA))
-        print("Conectado ao servidor.")
-
-        lista_arquivos = solicitar_lista_arquivos(s)
-
-        if lista_arquivos is not None:
-            print("Lista de Arquivos Disponíveis:")
-            for arquivo in lista_arquivos:
-                print(arquivo)
+        if autenticar(s, SENHA):
+            lista_arquivos = solicitar_lista_arquivos(s)
+            if lista_arquivos is not None:
+                print("Lista de Arquivos Disponíveis:")
+                for arquivo in lista_arquivos:
+                    print(arquivo)
+        else:
+            print("Erro: Senha incorreta.")
 
 
 if __name__ == "__main__":
