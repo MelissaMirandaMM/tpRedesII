@@ -29,8 +29,11 @@ def enviar_pacote(conexao, dados):
     conexao.send(pacote_serializado)
 
 def lidar_com_lista_arquivos(conexao):
-    lista_arquivos = os.listdir(DIRETORIO_ARQUIVOS)
-    enviar_pacote(conexao, lista_arquivos)
+    try:
+        lista_arquivos = os.listdir(DIRETORIO_ARQUIVOS)
+        enviar_pacote(conexao, lista_arquivos)
+    except Exception as e:
+        print(f"Erro ao lidar com a lista de arquivos: {e}")
 
 def lidar_com_download(conexao, nome_arquivo):
     try:
@@ -40,29 +43,52 @@ def lidar_com_download(conexao, nome_arquivo):
         enviar_pacote(conexao, dados_arquivo)
     except FileNotFoundError:
         conexao.send('Arquivo não encontrado.'.encode())
+    except Exception as e:
+        print(f"Erro ao lidar com o download do arquivo: {e}")
 
 def criar_diretorio_arquivos():
-    if not os.path.exists(DIRETORIO_ARQUIVOS):
-        os.makedirs(DIRETORIO_ARQUIVOS)
+    try:
+        if not os.path.exists(DIRETORIO_ARQUIVOS):
+            os.makedirs(DIRETORIO_ARQUIVOS)
+    except Exception as e:
+        print(f"Erro ao criar o diretório de arquivos: {e}")
 
 def calcular_checksum(data):
-    return hashlib.md5(data).hexdigest()
+    try:
+        # Encode the data before hashing
+        data_bytes = data.encode()
+        return hashlib.md5(data_bytes).hexdigest()
+    except Exception as e:
+        print(f"Erro ao calcular o checksum: {e}")
+        return None
 
 def criar_pacote(seq_num, data):
-    checksum = calcular_checksum(data.encode())
-    header = struct.pack('!I32s', seq_num, checksum.encode())
-    return header + data.encode()
+    try:
+        checksum = calcular_checksum(data.encode())
+        header = struct.pack('!I32s', seq_num, checksum.encode())
+        return header + data.encode()
+    except Exception as e:
+        print(f"Erro ao criar o pacote: {e}")
+        return None
 
 def extrair_pacote(data):
-    header = data[:36]
-    seq_num, checksum = struct.unpack('!I32s', header)
-    payload = data[36:]
-    return seq_num, checksum.decode(), payload.decode()
+    try:
+        header = data[:36]
+        seq_num, checksum = struct.unpack('!I32s', header)
+        payload = data[36:]
+        return seq_num, checksum.decode(), payload.decode()
+    except struct.error as e:
+        print(f"Erro ao extrair o pacote: {e}")
+        return None
 
 def criar_acknowledgment(seq_num):
-    acknowledgment_data = f"ACK for sequence number {seq_num}"
-    acknowledgment_packet = criar_pacote(seq_num, acknowledgment_data)
-    return acknowledgment_packet
+    try:
+        acknowledgment_data = f"ACK for sequence number {seq_num}"
+        acknowledgment_packet = criar_pacote(seq_num, acknowledgment_data)
+        return acknowledgment_packet
+    except Exception as e:
+        print(f"Erro ao criar o acknowledgment: {e}")
+        return None
 
 def servidor():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -75,6 +101,18 @@ def servidor():
 
         while True:
             conexao, endereco_cliente = s.accept()
+            data = conexao.recv(TAMANHO_PACOTE)
+            seq_num, checksum, payload = extrair_pacote(data)
+
+            if checksum == calcular_checksum(payload):
+                acknowledgment_packet = criar_acknowledgment(seq_num)
+                s.sendto(acknowledgment_packet, endereco_cliente)
+
+                with open(f'received_file_{seq_num}.txt', 'a') as file:
+                    file.write(payload)
+            else:
+                print("Erro: Checksum incorreto. Descartando pacote.")
+
             with conexao:
                 print(f"Conexão recebida de {endereco_cliente}")
 

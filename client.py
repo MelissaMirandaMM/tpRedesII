@@ -13,25 +13,26 @@ SENHA_CLIENTE = "123456"
 def autenticar_servidor(conexao, senha):
     conexao.send(hashlib.sha256(senha.encode()).hexdigest().encode())
     response = conexao.recv(TAMANHO_PACOTE).decode()
-    if response == 'OK':
-        return True
-    else:
-        return False
+    return response == 'OK'
 
 def receber_pacote(conexao):
     try:
         pacote_serializado = conexao.recv(TAMANHO_PACOTE)
         return pickle.loads(pacote_serializado)
-    except pickle.UnpicklingError:
-        print("Erro: Não foi possível desserializar o pacote.")
+    except pickle.UnpicklingError as e:
+        print(f"Erro: Não foi possível desserializar o pacote. {e}")
         return None
 
 def solicitar_lista_arquivos(conexao):
-    conexao.send('LISTA_ARQUIVOS'.encode())
-    return receber_pacote(conexao)
+    try:
+        conexao.send('LISTA_ARQUIVOS'.encode())
+        return receber_pacote(conexao)
+    except Exception as e:
+        print(f"Erro durante a solicitação da lista de arquivos. {e}")
+        return None
 
 def calcular_checksum(data):
-    return hashlib.md5(data).hexdigest()
+    return hashlib.md5(data.encode()).hexdigest()
 
 def criar_pacote(seq_num, data):
     checksum = calcular_checksum(data.encode())
@@ -63,14 +64,14 @@ def cliente():
                 if seq_num % WINDOW_SIZE != 0:
                     s.send(packet)
 
-                 # Receive acknowledgment
+                # Receive acknowledgment
                 s.settimeout(5.0)  # Set a timeout of 5 seconds
                 try:
                     acknowledgment = s.recv(TAMANHO_PACOTE)
-                    ack_seq_num, _, acknowledgment_payload = extrair_pacote(acknowledgment)
+                    ack_seq_num, _ , _ = extrair_pacote(acknowledgment)
 
                     if ack_seq_num == seq_num:
-                        print(f"Acknowledgment received for sequence number {seq_num}: {acknowledgment_payload}")
+                        print(f"Acknowledgment received for sequence number {seq_num}")
                         seq_num += 1
                         time.sleep(1)  # Simulate transmission delay
                     else:
