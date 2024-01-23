@@ -11,9 +11,10 @@ WINDOW_SIZE = 5
 SENHA_CLIENTE = "123456"
 
 def autenticar_servidor(conexao, senha):
-    conexao.send(hashlib.sha256(senha.encode()).hexdigest().encode())
+    hash_senha = hashlib.sha256(senha.encode()).hexdigest()
+    conexao.send(hash_senha.encode())
     response = conexao.recv(TAMANHO_PACOTE).decode()
-    return response == 'OK'
+    return response == 'OK'.encode().decode()
 
 def receber_pacote(conexao):
     try:
@@ -47,8 +48,11 @@ def extrair_pacote(data):
 
 def cliente():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        print("Conectando ao servidor...")
         s.connect((SERVIDOR_ENDERECO, SERVIDOR_PORTA))
+        print("Autenticando...")
         if autenticar_servidor(s, SENHA_CLIENTE):
+            print("Autenticado com sucesso.")
             lista_arquivos = solicitar_lista_arquivos(s)
             if lista_arquivos is not None:
                 print("Lista de Arquivos Disponíveis:")

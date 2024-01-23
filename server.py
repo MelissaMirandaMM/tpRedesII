@@ -15,9 +15,11 @@ def autenticar_cliente(conexao, senha):
     try:
         received_hash = conexao.recv(TAMANHO_PACOTE).decode()
         if received_hash == hashlib.sha256(senha.encode()).hexdigest():
+            print("Cliente autenticado com sucesso.")
             conexao.send('OK'.encode())
             return True
         else:
+            print("Erro: Senha de cliente incorreta.")
             conexao.send('NOK'.encode())
             return False
     except Exception as e:
@@ -98,20 +100,26 @@ def servidor():
         print(f"Servidor escutando na porta {SERVIDOR_PORTA}...")
 
         criar_diretorio_arquivos()
-
+        
         while True:
             conexao, endereco_cliente = s.accept()
             data = conexao.recv(TAMANHO_PACOTE)
-            seq_num, checksum, payload = extrair_pacote(data)
+            print(data)
+            
+            pacote = extrair_pacote(data)
+            if pacote is not None:
+                seq_num, checksum, payload = pacote
 
-            if checksum == calcular_checksum(payload):
-                acknowledgment_packet = criar_acknowledgment(seq_num)
-                s.sendto(acknowledgment_packet, endereco_cliente)
+                if checksum == calcular_checksum(payload):
+                    acknowledgment_packet = criar_acknowledgment(seq_num)
+                    s.sendto(acknowledgment_packet, endereco_cliente)
 
-                with open(f'received_file_{seq_num}.txt', 'a') as file:
-                    file.write(payload)
+                    with open(f'received_file_{seq_num}.txt', 'a') as file:
+                        file.write(payload)
+                else:
+                    print("Erro: Checksum incorreto. Descartando pacote.")
             else:
-                print("Erro: Checksum incorreto. Descartando pacote.")
+                print("Erro: Pacote inválido.")
 
             with conexao:
                 print(f"Conexão recebida de {endereco_cliente}")
