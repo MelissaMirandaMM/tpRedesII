@@ -1,141 +1,119 @@
-import hashlib
-import os
-import pickle
 import socket
-import struct
+import os
+import base64
 
-# Configurações
-SERVIDOR_PORTA = 12345
-TAMANHO_PACOTE = 1024
-DIRETORIO_ARQUIVOS = "arquivos_servidor"
-SENHA_SERVIDOR = "123456"
-WINDOW_SIZE = 5
+SENHA_CLIENTE = '123456'
+HOST = ''
+PORTA = 23240
+udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+origem = (HOST, PORTA)
+udp.bind(origem)
+diretorio = './pasta'
 
-def autenticar_cliente(conexao, senha):
-    try:
-        received_hash = conexao.recv(TAMANHO_PACOTE).decode()
-        if received_hash == hashlib.sha256(senha.encode()).hexdigest():
-            print("Cliente autenticado com sucesso.")
-            conexao.send('OK'.encode())
-            return True
-        else:
-            print("Erro: Senha de cliente incorreta.")
-            conexao.send('NOK'.encode())
-            return False
-    except Exception as e:
-        print(f"Erro durante a autenticação: {e}")
-        return False
+destino = ('localhost', 24250)
 
-def enviar_pacote(conexao, dados):
-    pacote_serializado = pickle.dumps(dados)
-    conexao.send(pacote_serializado)
-
-def lidar_com_lista_arquivos(conexao):
-    try:
-        lista_arquivos = os.listdir(DIRETORIO_ARQUIVOS)
-        enviar_pacote(conexao, lista_arquivos)
-    except Exception as e:
-        print(f"Erro ao lidar com a lista de arquivos: {e}")
-
-def lidar_com_download(conexao, nome_arquivo):
-    try:
-        with open(os.path.join(DIRETORIO_ARQUIVOS, nome_arquivo), 'rb') as f:
-            dados_arquivo = f.read()
-        conexao.send('OK'.encode())
-        enviar_pacote(conexao, dados_arquivo)
-    except FileNotFoundError:
-        conexao.send('Arquivo não encontrado.'.encode())
-    except Exception as e:
-        print(f"Erro ao lidar com o download do arquivo: {e}")
-
-def criar_diretorio_arquivos():
-    try:
-        if not os.path.exists(DIRETORIO_ARQUIVOS):
-            os.makedirs(DIRETORIO_ARQUIVOS)
-    except Exception as e:
-        print(f"Erro ao criar o diretório de arquivos: {e}")
+print('SOCKET na porta 23240')
 
 def calcular_checksum(data):
+    checksum = 0
+    for byte in data:
+        checksum += byte
+    return checksum & 0xFF  # Retorna apenas os 8 bits menos significativos
+
+def verifica_senha(sentence): # Função para verificar a senha
+    if sentence == SENHA_CLIENTE:
+        udp.sendto(bytes('EXITO: SENHA CORRETA!!!', 'ascii'), destino)
+        lista_arquivos = listar_arquivos()  # Renomeando a variável para evitar conflito com o nome da função
+        arquivos_str = ', '.join(lista_arquivos)
+        udp.sendto(bytes(arquivos_str, 'ascii'), destino)
+    else:
+        udp.sendto(bytes('ERRO: SENHA INCORRETA...', 'ascii'), destino)
+
+def listar_arquivos(): #Função para listar os arquivos da pasta
+    arquivos = os.listdir(diretorio)
+    lista_arquivos = []
+    for arquivo in arquivos:
+        if os.path.isfile(os.path.join(diretorio, arquivo)):
+            lista_arquivos.append(arquivo)
+
+    return lista_arquivos
+
+def selecionar_arquivo(filename): #Função para selecionar o arquivo
+    if filename not in listar_arquivos():
+        udp.sendto(bytes('EXITO: ARQUIVO NÃO ENCONTRADO', 'ascii'), destino)
+        raise Exception('ERRO: ARQUIVO NÃO ENCONTRADO')
+
+    udp.sendto(bytes('ENVIANDO O ARQUIVO... ' + filename, 'ascii'), destino)
+    enviar_arquivo(filename)
+
+def enviar_arquivo(filename):
     try:
-        # Encode the data before hashing
-        data_bytes = data.encode()
-        return hashlib.md5(data_bytes).hexdigest()
-    except Exception as e:
-        print(f"Erro ao calcular o checksum: {e}")
-        return None
+        with open(os.path.join(diretorio, filename), "rb") as arquivo:
+            conteudo_arquivo = arquivo.read()
+            arquivo_codificado = base64.b64encode(conteudo_arquivo)
+            arquivo_str = arquivo_codificado.decode("ascii")
 
-def criar_pacote(seq_num, data):
-    try:
-        checksum = calcular_checksum(data.encode())
-        header = struct.pack('!I32s', seq_num, checksum.encode())
-        return header + data.encode()
-    except Exception as e:
-        print(f"Erro ao criar o pacote: {e}")
-        return None
+            length = len(arquivo_str)
+            tam = len(arquivo_str)
 
-def extrair_pacote(data):
-    try:
-        header = data[:36]
-        seq_num, checksum = struct.unpack('!I32s', header)
-        payload = data[36:]
-        return seq_num, checksum.decode(), payload.decode()
-    except struct.error as e:
-        print(f"Erro ao extrair o pacote: {e}")
-        return None
+            initial = 0
+            final = 1023
 
-def criar_acknowledgment(seq_num):
-    try:
-        acknowledgment_data = f"ACK for sequence number {seq_num}"
-        acknowledgment_packet = criar_pacote(seq_num, acknowledgment_data)
-        return acknowledgment_packet
-    except Exception as e:
-        print(f"Erro ao criar o acknowledgment: {e}")
-        return None
+            while length > 0:
+                data = bytes(arquivo_str[initial:final], 'ascii')
+                checksum = calcular_checksum(data)  # Calcula o checksum dos dados
+                data_com_checksum = bytes([checksum]) + data  # Anexa o checksum aos dados
+                udp.sendto(data_com_checksum, destino)
+                print('PACOTE ENVIADO')
+                while True:
+                    try:
+                        ack, addr = udp.recvfrom(1024)
+                        if ack == b'ACK':
+                            break
+                    except socket.timeout:
+                        print("Timeout: ACK perdido, reenviando...")
+                        udp.sendto(data_com_checksum, destino)
 
-def servidor():
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(('0.0.0.0', SERVIDOR_PORTA))
-        s.listen()
-
-        print(f"Servidor escutando na porta {SERVIDOR_PORTA}...")
-
-        criar_diretorio_arquivos()
-        
-        while True:
-            conexao, endereco_cliente = s.accept()
-            data = conexao.recv(TAMANHO_PACOTE)
-            print(data)
-            
-            pacote = extrair_pacote(data)
-            if pacote is not None:
-                seq_num, checksum, payload = pacote
-
-                if checksum == calcular_checksum(payload):
-                    acknowledgment_packet = criar_acknowledgment(seq_num)
-                    s.sendto(acknowledgment_packet, endereco_cliente)
-
-                    with open(f'received_file_{seq_num}.txt', 'a') as file:
-                        file.write(payload)
+                initial = final
+                if length < 1024:
+                    final = final + length
                 else:
-                    print("Erro: Checksum incorreto. Descartando pacote.")
+                    final = final + 1024
+                if length <= 1024:
+                    length = length - length
+                else:
+                    length = length - 1024
+
+            print('Tamanho do arquivo:', tam)
+            print('FIM DA TRANSMISSÃO NO SERVIDOR')
+            udp.sendto(b'ENCERRADO', destino)
+
+    except Exception as e:
+        print(str(e))
+        raise Exception(f"ERRO: FALHA AO ENVIAR ARQUIVO {filename}.")
+
+while True:
+    try:
+        message, cliente = udp.recvfrom(1024)
+        sentence = message.decode('ascii')
+        print(cliente, sentence)
+
+        parts = sentence.split("|")
+        if len(parts) < 2:
+            if sentence == "ACK":
+                continue  # Ignora mensagens "ACK"
             else:
-                print("Erro: Pacote inválido.")
+                raise Exception("Mensagem mal formatada: {}".format(sentence))
 
-            with conexao:
-                print(f"Conexão recebida de {endereco_cliente}")
+        idetify = parts[0]
+        message = parts[1]
 
-                if autenticar_cliente(conexao, SENHA_SERVIDOR):
-                    dados = conexao.recv(TAMANHO_PACOTE).decode()
-
-                    if dados == 'LISTA_ARQUIVOS':
-                        lidar_com_lista_arquivos(conexao)
-                    elif dados.startswith('DOWNLOAD'):
-                        _, nome_arquivo = dados.split(' ', 1)
-                        lidar_com_download(conexao, nome_arquivo)
-                    else:
-                        print("Comando inválido recebido.")
-                else:
-                    print("Erro: Senha de cliente incorreta.")
-
-if __name__ == "__main__":
-    servidor()
+        if idetify == "password":
+            verifica_senha(message)
+        elif idetify == 'select_file':
+            selecionar_arquivo(message)
+    except Exception as e:
+        udp.sendto(bytes('ERRO: SERVIDOR COM FALHA', 'ascii'), destino)
+        print('ERRO', str(e))
+        if str(e) != 'DATAGRAMA MAIOR DO QUE O PERMITIDO NA REDE':
+            raise Exception(str(e))
