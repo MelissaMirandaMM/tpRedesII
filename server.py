@@ -1,6 +1,20 @@
 import socket
 import os
 import base64
+from azure.storage.filedatalake import DataLakeServiceClient
+
+# Configurações de conexão
+account_name = 'felipeazure'
+file_system_name = 'BlockBlobStorage'
+file_system_client = 'str'
+file_system_key = '/subscriptions/f541d637-c00b-4160-8405-dc73034d48b4/resourcegroups/NetworkWatcherRG/providers/Microsoft.Storage/storageAccounts/felipeazure'
+
+# Criando o serviço cliente
+service_client = DataLakeServiceClient(account_url=f"https://{account_name}.dfs.core.windows.net", credential=file_system_key)
+
+# Criando o sistema de arquivos se não existir
+file_system_client = service_client.create_file_system(file_system=file_system_name)
+
 
 SENHA_CLIENTE = '123456'
 HOST = ''
