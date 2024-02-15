@@ -1,13 +1,18 @@
 import socket
 import os
 import base64
-import time
+from azure.storage.blob import BlobServiceClient, BlobClient
 
 HOST = 'localhost'
 PORTA = 23240
 udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 dest = (HOST, PORTA)
-diretorio = './pasta'
+
+service = BlobServiceClient(account_url="https://felipeazure.blob.core.windows.net/")
+
+# Criar novo container ou acessar um existente
+container_name = "tpredes"
+container_client = service.get_container_client(container_name)
 
 # Importando a função calcular_checksum
 def calcular_checksum(data):
@@ -52,14 +57,19 @@ def receber_arquivo(filename):
     print('FIM DA TRANSMISSAO DO ARQUIVO NO CLIENTE')
 
     try:
-        caminho_completo = os.path.join(diretorio, filename)
-        with open(caminho_completo, "wb") as arquivo:
-            bufferIsString = b''.join(buffer)
-            arquivo_decodificado = base64.b64decode(bufferIsString)
-            arquivo.write(arquivo_decodificado)
-        print("EXITO: CAMINHO DO ARQUIVO", caminho_completo)
+        # Selecionar arquivo do container que possui o mesmo nome do arquivo recebido
+        arquivo_selecionado = container_client.get_blob_client(filename)
+
+        # Exibir apenas os arquivos do container que possuem o mesmo nome do arquivo recebido
+        print("Arquivo selecionado:", arquivo_selecionado.blob_name)
+
+        # Salvar o arquivo selecionado no container com o mesmo nome do arquivo recebido
+        arquivo_selecionado.upload_blob(base64.b64decode(b''.join(buffer)))
+
+        # Mostrar mensagem de sucesso
+        print("EXITO: ARQUIVO ENVIADO PARA O CONTAINER")
     except Exception as e:
-        raise Exception("ERRO: ARQUIVO NAO SALVO", str(e))
+        raise Exception("ERRO: ARQUIVO NÃO SALVO NO CONTAINER", str(e))
 
 udp.bind(('', 24250))
 udp.settimeout(5)  # Configura um timeout de 5 segundos
