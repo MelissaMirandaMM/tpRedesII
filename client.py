@@ -65,8 +65,8 @@ def receber_arquivo(filename):
         # Exibir apenas os arquivos do container que possuem o mesmo nome do arquivo recebido
         print("Arquivo selecionado:", arquivo_selecionado.blob_name)
 
-        # Salvar o arquivo selecionado no container com o mesmo nome do arquivo recebido
-        arquivo_selecionado.upload_blob(base64.b64decode(b''.join(buffer)))
+        # Salvar o arquivo selecionado no container com o mesmo nome do arquivo recebido mesmo se o arquivo já existir
+        arquivo_selecionado.upload_blob(base64.b64decode(b''.join(buffer)), overwrite=True)
 
         # Mostrar mensagem de sucesso
         print("EXITO: ARQUIVO ENVIADO PARA O CONTAINER")
