@@ -21,11 +21,6 @@ service = BlobServiceClient(account_url="https://felipeazure.blob.core.windows.n
 container_name = "tpredes"
 container_client = service.get_container_client(container_name)
 
-# Mostrar arquivos no container (Ideal para testar se há conexão com o Azure)
-print("Arquivos no container:")
-for blob in container_client.list_blobs():
-    print(blob.name)
-
 def calcular_checksum(data):
     checksum = 0
     for byte in data:
