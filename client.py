@@ -1,14 +1,16 @@
 import socket
 import os
 import base64
-from azure.storage.blob import BlobServiceClient, BlobClient
+from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
 
 HOST = 'localhost'
 PORTA = 23240
 udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 dest = (HOST, PORTA)
 
-service = BlobServiceClient(account_url="https://felipeazure.blob.core.windows.net/")
+# Configurar a autenticação corretamente usando a chave de acesso ou SAS
+service = BlobServiceClient(account_url="https://felipeazure.blob.core.windows.net/tpredes?si=tpredes&sv=2022-11-02&sr=c&sig=0mufXe5IEIM050%2BjNFgpnRW%2BwGNY29A7Tz5WJLVjpcc%3D",
+                            credential="si=tpredes&sv=2022-11-02&sr=c&sig=0mufXe5IEIM050%2BjNFgpnRW%2BwGNY29A7Tz5WJLVjpcc%3D")
 
 # Criar novo container ou acessar um existente
 container_name = "tpredes"
