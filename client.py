@@ -1,10 +1,9 @@
 import socket
-import os
 import base64
-from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
+from azure.storage.blob import BlobServiceClient
 
 HOST = 'localhost'
-PORTA = 23240
+PORTA = 2000
 udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 dest = (HOST, PORTA)
 

@@ -5,7 +5,7 @@ from azure.storage.blob import BlobServiceClient
 # Configurações do servidor UDP
 SENHA_CLIENTE = '123456'
 HOST = ''
-PORTA = 23240
+PORTA = 2000
 udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 origem = (HOST, PORTA)
 udp.bind(origem)
@@ -13,7 +13,7 @@ udp.settimeout(10)  # Configura um timeout de 10 segundos
 
 destino = ('localhost', 24250)
 
-print('SOCKET na porta 23240')
+print('SOCKET na porta 2000')
 
 service = BlobServiceClient(account_url="https://felipeazure.blob.core.windows.net/")
 
